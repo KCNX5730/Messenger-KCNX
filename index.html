@@ -1,9 +1,9 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KCNX Enterprise Peer Router</title>
+    <title>KCNX 35-Node Enterprise Router</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -67,11 +67,7 @@
             <label for="msgTarget">Security Level Routing Target:</label>
             <select id="msgTarget">
                 <option value="ALL">Everyone (Public Broadcast Layer)</option>
-                <option value="1">Restrict To: User #1 Only</option>
-                <option value="2">Restrict To: User #2 Only</option>
-                <option value="3">Restrict To: User #3 Only</option>
-                <option value="4">Restrict To: User #4 Only</option>
-            </select>
+                </select>
         </div>
         <div class="input-row">
             <textarea id="msgTextInput" placeholder="Write an un-interceptable data payload..."></textarea>
@@ -83,9 +79,8 @@
 <script>
     // Global Configuration Object
     const CONFIG = {
-        // Change this sequence key string to isolate your private app network entirely
         ROOM_NAMESPACE: "kcnx_secure_mesh_v3_production",
-        MAX_NODE_SEARCH: 5
+        MAX_NODE_SEARCH: 35 // 🚀 Scaled up to support 35 distinct users
     };
 
     let myAssignedNumber = sessionStorage.getItem('kcnx_session_node_id');
@@ -93,8 +88,20 @@
     let activeConnections = {};
     let localMessageHistory = [];
 
+    // Dynamically build target selector list from 1 to 35
+    function populateDropdownMenu() {
+        const select = document.getElementById('msgTarget');
+        for (let i = 1; i <= CONFIG.MAX_NODE_SEARCH; i++) {
+            const option = document.createElement('option');
+            option.value = i.toString();
+            option.innerText = `Restrict To: User #${i} Only`;
+            select.appendChild(option);
+        }
+    }
+
     // 1. Core Dynamic Node Sequencing Engine
     async function initAutonomousRouter() {
+        populateDropdownMenu();
         if (myAssignedNumber) {
             setupP2PMeshNode(parseInt(myAssignedNumber));
         } else {
@@ -105,26 +112,24 @@
 
     async function searchAvailableNodeSlot(slotNumber) {
         if (slotNumber > CONFIG.MAX_NODE_SEARCH) {
-            slotNumber = Math.floor(Math.random() * 3) + 1; // Last resort safe fallback
+            slotNumber = Math.floor(Math.random() * CONFIG.MAX_NODE_SEARCH) + 1; // Fallback
             setupP2PMeshNode(slotNumber);
             return;
         }
 
-        document.getElementById('networkStatusLabel').innerText = `Checking system slot status: Node #${slotNumber}...`;
+        document.getElementById('networkStatusLabel').innerText = `Checking slot status: Node #${slotNumber}...`;
         
         const testId = `${CONFIG.ROOM_NAMESPACE}_node_${slotNumber}`;
         const testPeer = new Peer(testId, { debug: 0 });
 
         testPeer.on('open', () => {
-            // Slot is fully open and available! Claim it permanently for this browser tab session.
             testPeer.destroy(); 
             setupP2PMeshNode(slotNumber);
         });
 
         testPeer.on('error', (err) => {
-            // Slot is occupied (error code 'unavailable-id'). Destroy temp handler and test the next slot up.
             testPeer.destroy();
-            setTimeout(() => { searchAvailableNodeSlot(slotNumber + 1); }, 150);
+            setTimeout(() => { searchAvailableNodeSlot(slotNumber + 1); }, 50); // Fast scan speed
         });
     }
 
@@ -139,21 +144,18 @@
         peer = new Peer(finalId, { debug: 1 });
 
         peer.on('open', () => {
-            updateStatusUI(true, "Mesh Online. Discovering available target nodes...");
+            updateStatusUI(true, "Mesh Online. Connecting to network nodes...");
             discoverAndLinkPeers();
         });
 
-        // Listen for incoming direct data pipelines from other phones
         peer.on('connection', (conn) => {
             bindConnectionEvents(conn);
         });
 
         peer.on('disconnected', () => peer.reconnect());
-        peer.on('error', (err) => console.error("Router Socket Fault:", err));
     }
 
     function discoverAndLinkPeers() {
-        // Cycle up to maximum node capacities and open bi-directional connection channels
         for (let i = 1; i <= CONFIG.MAX_NODE_SEARCH; i++) {
             if (i.toString() !== myAssignedNumber) {
                 const targetId = `${CONFIG.ROOM_NAMESPACE}_node_${i}`;
@@ -166,24 +168,23 @@
     function bindConnectionEvents(conn) {
         conn.on('open', () => {
             activeConnections[conn.peer] = conn;
-            updateStatusUI(true, `Connected to active network mesh clients.`);
+            updateStatusUI(true, `Connected to active mesh network nodes.`);
         });
 
         conn.on('data', (jsonPacket) => {
             try {
                 const packet = typeof jsonPacket === 'string' ? JSON.parse(jsonPacket) : jsonPacket;
-                // Double-check packet duplication safety rules
                 if (!localMessageHistory.some(m => m.id === packet.id)) {
                     localMessageHistory.push(packet);
                     renderFeed();
                 }
-            } catch (e) { console.error("Corrupted Packet Header dropped:", e); }
+            } catch (e) { console.error("Drop fault:", e); }
         });
 
         conn.on('close', () => {
             delete activeConnections[conn.peer];
             if (Object.keys(activeConnections).length === 0) {
-                updateStatusUI(false, "Scanning for other devices...");
+                updateStatusUI(false, "Scanning network...");
             }
         });
     }
@@ -207,7 +208,6 @@
 
         const serializedPacket = JSON.stringify(packet);
 
-        // Dispatches packet globally down all active open WebRTC connection lanes simultaneously
         Object.values(activeConnections).forEach(conn => {
             if (conn.open) {
                 conn.send(serializedPacket);
@@ -242,7 +242,6 @@
                 card.innerHTML = `<span class="meta">From User #${msg.sender} 🔒 [Private Inbound]</span> ${msg.text}`;
             } 
             else {
-                // Cryptographic network mask rule applied
                 card.className = "msg-card msg-blocked";
                 card.innerHTML = `<span class="meta">System Protected</span> 🔒 This Message is not for you.`;
             }
@@ -264,7 +263,6 @@
         }
     }
 
-    // Key Listener Hook for Enter Submissions
     document.getElementById('msgTextInput').addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -272,9 +270,7 @@
         }
     });
 
-    // Boot up the router initialization loop
     initAutonomousRouter();
 </script>
 </body>
-    </html>
-    
+</html>
