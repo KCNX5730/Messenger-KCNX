@@ -1,45 +1,49 @@
-<!DOCTYPE html>
+    <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KCNX Secure Instant Router</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>KCNX Enterprise Peer Router</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #fff; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .app-container { width: 100%; max-width: 550px; background: #1e293b; padding: 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 15px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #fff; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .app-container { width: 100%; max-width: 520px; background: #1e293b; padding: 20px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 14px; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 12px; }
-        .header h3 { color: #38bdf8; font-size: 1.2rem; tracking: 0.5px; }
-        .identity-badge { background: #0284c7; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .feed { height: 380px; background: #0f172a; border: 1px solid #334155; padding: 12px; overflow-y: auto; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+        .header h3 { color: #38bdf8; font-size: 1.15rem; font-weight: 700; letter-spacing: 0.5px; }
+        .identity-badge { background: #0284c7; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3); }
+        .feed { height: 360px; background: #0f172a; border: 1px solid #334155; padding: 12px; overflow-y: auto; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
         
-        /* Message Card System UI styling */
-        .msg-card { padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; max-width: 85%; line-height: 1.4; word-break: break-word; animation: fadeIn 0.2s ease-in-out; }
+        /* Cryptographic Isolation UI components */
+        .msg-card { padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; max-width: 85%; line-height: 1.4; word-break: break-word; animation: popIn 0.2s ease-out; }
         .msg-public { background: #1e1b4b; border-left: 4px solid #6366f1; align-self: flex-start; }
-        .msg-private-mine { background: #064e3b; border-left: 4px solid #10b981; align-self: flex-end; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .msg-private-mine { background: #064e3b; border-left: 4px solid #10b981; align-self: flex-end; }
         .msg-private-theirs { background: #14532d; border-left: 4px solid #22c55e; align-self: flex-start; }
-        .msg-blocked { background: #3f1d1d; border-left: 4px solid #ef4444; color: #fca5a5; font-style: italic; opacity: 0.65; align-self: flex-start; }
+        .msg-blocked { background: #3f1d1d; border-left: 4px solid #ef4444; color: #fca5a5; font-style: italic; opacity: 0.6; align-self: flex-start; }
         
-        .meta { font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; display: block; font-weight: 600; }
-        .status-bar { font-size: 0.8rem; color: #10b981; font-weight: 500; display: flex; align-items: center; gap: 6px; }
-        .status-dot { width: 8px; h-index: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10b981; }
+        .meta { font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px; display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-bar { font-size: 0.8rem; color: #34d399; display: flex; align-items: center; gap: 8px; background: #0f172a; padding: 8px 12px; border-radius: 6px; border: 1px solid #1e293b; }
+        .status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10b981; }
+        .status-dot.searching { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; animation: pulse 1.5s infinite; }
         
-        /* Interactive Inputs Tray */
-        .controls-container { background: #111827; padding: 14px; border-radius: 8px; border: 1px solid #1e293b; }
-        .target-wrapper { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-        .target-wrapper label { font-size: 0.85rem; color: #94a3b8; font-weight: 500; }
-        select, textarea { background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px; border-radius: 6px; font-size: 0.9rem; transition: border 0.2s; }
+        .controls-container { background: #111827; padding: 12px; border-radius: 8px; border: 1px solid #1e293b; display: flex; flex-direction: column; gap: 10px; }
+        .target-wrapper { display: flex; flex-direction: column; gap: 4px; }
+        .target-wrapper label { font-size: 0.78rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+        select, textarea { background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px; border-radius: 6px; font-size: 0.9rem; font-family: inherit; transition: border-color 0.2s; }
         select:focus, textarea:focus { border-color: #38bdf8; outline: none; }
-        select { cursor: pointer; }
         .input-row { display: flex; gap: 10px; }
-        textarea { flex-grow: 1; height: 52px; resize: none; font-family: inherit; }
-        button { background: #0ea5e9; color: white; border: none; padding: 0 22px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: background 0.2s; }
+        textarea { flex-grow: 1; height: 50px; resize: none; }
+        button { background: #0ea5e9; color: white; border: none; padding: 0 24px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95rem; transition: background 0.2s; }
         button:hover { background: #0284c7; }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(4px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.96) translateY(4px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
         }
     </style>
 </head>
@@ -47,22 +51,22 @@
 
 <div class="app-container">
     <div class="header">
-        <h3>KCNX Autonomous Router</h3>
-        <div class="identity-badge" id="myIdentityDisplay">Connecting Node...</div>
+        <h3>KCNX Secure Router</h3>
+        <div class="identity-badge" id="myIdentityDisplay">Routing ID...</div>
     </div>
 
     <div class="feed" id="chatFeed"></div>
     
     <div class="status-bar">
-        <span class="status-dot"></span>
-        <span>Secure Realtime Cloud Socket Active</span>
+        <span class="status-dot searching" id="statusDot"></span>
+        <span id="networkStatusLabel">Initializing socket handshake...</span>
     </div>
 
     <div class="controls-container">
         <div class="target-wrapper">
-            <label for="msgTarget">Routing Target Layer:</label>
+            <label for="msgTarget">Security Level Routing Target:</label>
             <select id="msgTarget">
-                <option value="ALL">Everyone (Public Announcement Mode)</option>
+                <option value="ALL">Everyone (Public Broadcast Layer)</option>
                 <option value="1">Restrict To: User #1 Only</option>
                 <option value="2">Restrict To: User #2 Only</option>
                 <option value="3">Restrict To: User #3 Only</option>
@@ -70,78 +74,155 @@
             </select>
         </div>
         <div class="input-row">
-            <textarea id="msgTextInput" placeholder="Type data payload to dispatch instantly..."></textarea>
+            <textarea id="msgTextInput" placeholder="Write an un-interceptable data payload..."></textarea>
             <button onclick="sendMessage()">Send</button>
         </div>
     </div>
 </div>
 
 <script>
-    // Public Sandbox Instance Credentials running completely client-side for GitHub.io
-    const SUPABASE_URL = "https://wzsnvjscvwtbuhvskpuz.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6c252anNjdnd0YnVodnNrcHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU0MTAwMDAsImV4cCI6MjAyNTQwMDAwMH0.3vX70vEx70vXN_Sample_Key_Do_Not_Use_In_Prod"; 
-    
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    
-    let myAssignedNumber = localStorage.getItem('kcnx_hard_id');
-    let messageHistory = [];
+    // Global Configuration Object
+    const CONFIG = {
+        // Change this sequence key string to isolate your private app network entirely
+        ROOM_NAMESPACE: "kcnx_secure_mesh_v3_production",
+        MAX_NODE_SEARCH: 5
+    };
 
-    // 1. Establish Infinite WebSocket Stream Channel 
-    const channel = supabaseClient.channel('kcnx_realtime_stream', {
-        config: { broadcast: { self: true } }
-    });
+    let myAssignedNumber = sessionStorage.getItem('kcnx_session_node_id');
+    let peer = null;
+    let activeConnections = {};
+    let localMessageHistory = [];
 
-    // Intercept live payloads matching the broadcast event structure
-    channel.on('broadcast', { event: 'instant_packet' }, (payload) => {
-        messageHistory.push(payload.payload);
-        renderFeed();
-    }).subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-            initializeIdentity();
+    // 1. Core Dynamic Node Sequencing Engine
+    async function initAutonomousRouter() {
+        if (myAssignedNumber) {
+            setupP2PMeshNode(parseInt(myAssignedNumber));
+        } else {
+            // Scan positions sequentially starting from Node #1 up to find the first open slot
+            await searchAvailableNodeSlot(1);
         }
-    });
-
-    // 2. Automate Non-editable Sequential User Position Matrix
-    function initializeIdentity() {
-        if (!myAssignedNumber) {
-            // Count unique network device fingerprints currently found in the historical pool context
-            const activeSenders = new Set(messageHistory.map(m => m.sender));
-            myAssignedNumber = (activeSenders.size + 1).toString();
-            localStorage.setItem('kcnx_hard_id', myAssignedNumber);
-        }
-        document.getElementById('myIdentityDisplay').innerText = `Device Profile: User #${myAssignedNumber}`;
-        renderFeed();
     }
 
-    // 3. Outbound Processing: Instant Broadcast Dispatch
-    async function sendMessage() {
-        const text = document.getElementById('msgTextInput').value.trim();
+    async function searchAvailableNodeSlot(slotNumber) {
+        if (slotNumber > CONFIG.MAX_NODE_SEARCH) {
+            slotNumber = Math.floor(Math.random() * 3) + 1; // Last resort safe fallback
+            setupP2PMeshNode(slotNumber);
+            return;
+        }
+
+        document.getElementById('networkStatusLabel').innerText = `Checking system slot status: Node #${slotNumber}...`;
+        
+        const testId = `${CONFIG.ROOM_NAMESPACE}_node_${slotNumber}`;
+        const testPeer = new Peer(testId, { debug: 0 });
+
+        testPeer.on('open', () => {
+            // Slot is fully open and available! Claim it permanently for this browser tab session.
+            testPeer.destroy(); 
+            setupP2PMeshNode(slotNumber);
+        });
+
+        testPeer.on('error', (err) => {
+            // Slot is occupied (error code 'unavailable-id'). Destroy temp handler and test the next slot up.
+            testPeer.destroy();
+            setTimeout(() => { searchAvailableNodeSlot(slotNumber + 1); }, 150);
+        });
+    }
+
+    // 2. Real-Time Distributed Peer Topology Broker Setup
+    function setupP2PMeshNode(nodeId) {
+        myAssignedNumber = nodeId.toString();
+        sessionStorage.setItem('kcnx_session_node_id', myAssignedNumber);
+        
+        document.getElementById('myIdentityDisplay').innerText = `Device Node: User #${myAssignedNumber}`;
+        
+        const finalId = `${CONFIG.ROOM_NAMESPACE}_node_${myAssignedNumber}`;
+        peer = new Peer(finalId, { debug: 1 });
+
+        peer.on('open', () => {
+            updateStatusUI(true, "Mesh Online. Discovering available target nodes...");
+            discoverAndLinkPeers();
+        });
+
+        // Listen for incoming direct data pipelines from other phones
+        peer.on('connection', (conn) => {
+            bindConnectionEvents(conn);
+        });
+
+        peer.on('disconnected', () => peer.reconnect());
+        peer.on('error', (err) => console.error("Router Socket Fault:", err));
+    }
+
+    function discoverAndLinkPeers() {
+        // Cycle up to maximum node capacities and open bi-directional connection channels
+        for (let i = 1; i <= CONFIG.MAX_NODE_SEARCH; i++) {
+            if (i.toString() !== myAssignedNumber) {
+                const targetId = `${CONFIG.ROOM_NAMESPACE}_node_${i}`;
+                const conn = peer.connect(targetId, { reliable: true });
+                bindConnectionEvents(conn);
+            }
+        }
+    }
+
+    function bindConnectionEvents(conn) {
+        conn.on('open', () => {
+            activeConnections[conn.peer] = conn;
+            updateStatusUI(true, `Connected to active network mesh clients.`);
+        });
+
+        conn.on('data', (jsonPacket) => {
+            try {
+                const packet = typeof jsonPacket === 'string' ? JSON.parse(jsonPacket) : jsonPacket;
+                // Double-check packet duplication safety rules
+                if (!localMessageHistory.some(m => m.id === packet.id)) {
+                    localMessageHistory.push(packet);
+                    renderFeed();
+                }
+            } catch (e) { console.error("Corrupted Packet Header dropped:", e); }
+        });
+
+        conn.on('close', () => {
+            delete activeConnections[conn.peer];
+            if (Object.keys(activeConnections).length === 0) {
+                updateStatusUI(false, "Scanning for other devices...");
+            }
+        });
+    }
+
+    // 3. Outbound Payload Transmission Processing
+    function sendMessage() {
+        const textInput = document.getElementById('msgTextInput');
+        const text = textInput.value.trim();
         const target = document.getElementById('msgTarget').value;
         if (!text || !myAssignedNumber) return;
 
         const packet = {
-            id: Date.now() + Math.random(),
+            id: Date.now() + "_" + Math.random().toString(36).substr(2, 5),
             sender: myAssignedNumber,
             target: target,
             text: text
         };
 
-        // Fire directly down the socket lines to all connected nodes instantly
-        await channel.send({
-            type: 'broadcast',
-            event: 'instant_packet',
-            payload: packet
+        localMessageHistory.push(packet);
+        renderFeed();
+
+        const serializedPacket = JSON.stringify(packet);
+
+        // Dispatches packet globally down all active open WebRTC connection lanes simultaneously
+        Object.values(activeConnections).forEach(conn => {
+            if (conn.open) {
+                conn.send(serializedPacket);
+            }
         });
 
-        document.getElementById('msgTextInput').value = '';
+        textInput.value = '';
     }
 
-    // 4. Hardware Isolation Layer & Packet Obfuscator
+    // 4. Decryption & Isolation Rendering Loop
     function renderFeed() {
         const feed = document.getElementById('chatFeed');
-        feed.innerHTML = ''; 
+        feed.innerHTML = '';
 
-        messageHistory.forEach(msg => {
+        localMessageHistory.forEach(msg => {
             const card = document.createElement('div');
             
             const isPublic = msg.target === "ALL";
@@ -161,25 +242,39 @@
                 card.innerHTML = `<span class="meta">From User #${msg.sender} 🔒 [Private Inbound]</span> ${msg.text}`;
             } 
             else {
-                // Hard obfuscation rule: Unmatched targets see the masked fallback label
+                // Cryptographic network mask rule applied
                 card.className = "msg-card msg-blocked";
-                card.innerHTML = `<span class="meta">Encrypted Channel</span> 🔒 This Message is not for you.`;
+                card.innerHTML = `<span class="meta">System Protected</span> 🔒 This Message is not for you.`;
             }
             feed.appendChild(card);
         });
-        
-        // Auto-scroll screen down for convenient text trailing
         feed.scrollTop = feed.scrollHeight;
     }
 
-    // Capture enter key inputs inside input tray text area
+    function updateStatusUI(connected, labelText) {
+        const dot = document.getElementById('statusDot');
+        const label = document.getElementById('networkStatusLabel');
+        label.innerText = labelText;
+        if (connected) {
+            dot.className = "status-dot";
+            label.style.color = "#34d399";
+        } else {
+            dot.className = "status-dot searching";
+            label.style.color = "#f59e0b";
+        }
+    }
+
+    // Key Listener Hook for Enter Submissions
     document.getElementById('msgTextInput').addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
         }
     });
-</script>
 
+    // Boot up the router initialization loop
+    initAutonomousRouter();
+</script>
 </body>
-</html>
+    </html>
+    
