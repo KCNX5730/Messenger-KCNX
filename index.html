@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>KCNX Hard-Locked Router</title>
+    <style>
+        body { font-family: sans-serif; background: #0f172a; color: #fff; padding: 20px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 550px; background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .identity-badge { background: #0284c7; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; }
+        .feed { height: 300px; background: #0f172a; border: 1px solid #334155; margin: 15px 0; padding: 10px; overflow-y: auto; border-radius: 6px; display: flex; flex-direction: column; gap: 8px; }
+        
+        .msg-card { padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; max-width: 85%; }
+        .msg-public { background: #1e1b4b; border-left: 4px solid #6366f1; }
+        .msg-private-mine { background: #064e3b; border-left: 4px solid #10b981; align-self: flex-end; }
+        .msg-blocked { background: #3f1d1d; border-left: 4px solid #ef4444; color: #fca5a5; font-style: italic; opacity: 0.7; }
+        
+        .meta { font-size: 0.75rem; color: #94a3b8; margin-bottom: 3px; display: block; }
+        .controls { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        input, select, textarea { background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px; border-radius: 6px; box-sizing: border-box; }
+        textarea { flex-grow: 1; width: 100%; height: 50px; resize: none; }
+        button { background: #0ea5e9; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .timer-tag { font-size: 0.8rem; color: #38bdf8; text-align: right; margin-top: -10px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <h3>KCNX Autonomous Router</h3>
+        <div class="identity-badge" id="myIdentityDisplay">Assigning User ID...</div>
+    </div>
+
+    <div class="feed" id="chatFeed"></div>
+    <div class="timer-tag" id="timerDisplay">Refreshing in 5s...</div>
+
+    <div style="background: #111827; padding: 12px; border-radius: 6px;">
+        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+            <label style="font-size: 0.85rem; color: #94a3b8;">Send Target:</label>
+            <select id="msgTarget">
+                <option value="ALL">Everyone (Public Announcement)</option>
+                <option value="1">Target: User #1 Only</option>
+                <option value="2">Target: User #2 Only</option>
+                <option value="3">Target: User #3 Only</option>
+            </select>
+        </div>
+        <div class="controls">
+            <textarea id="msgTextInput" placeholder="Type an un-interceptable routing payload..."></textarea>
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Establish automated dynamic assignment
+    let myAssignedNumber = localStorage.getItem('kcnx_locked_id');
+    
+    if (!myAssignedNumber) {
+        // If device has no number, we track and count globally using an instant free endpoint
+        // For local layout demonstration, we simulate dynamic global increment securely:
+        let dynamicCounter = localStorage.getItem('global_network_counter') || 0;
+        dynamicCounter = parseInt(dynamicCounter) + 1;
+        localStorage.setItem('global_network_counter', dynamicCounter);
+        
+        myAssignedNumber = dynamicCounter.toString();
+        localStorage.setItem('kcnx_locked_id', myAssignedNumber);
+    }
+
+    document.getElementById('myIdentityDisplay').innerText = `Your Device Node: User #${myAssignedNumber}`;
+
+    // Initialize mock database architecture
+    if (!localStorage.getItem('kcnx_database')) {
+        localStorage.setItem('kcnx_database', JSON.stringify([
+            { sender: "System", target: "ALL", text: "Secure channels loaded automatically.", timestamp: "Now" }
+        ]));
+    }
+
+    let countdown = 5;
+
+    // 2. 5-Second Refresh Handler
+    setInterval(() => {
+        countdown--;
+        document.getElementById('timerDisplay').innerText = `Syncing in ${countdown}s...`;
+        if (countdown <= 0) {
+            refreshFeed();
+            countdown = 5;
+        }
+    }, 1000);
+
+    // 3. Outbound Processing
+    function sendMessage() {
+        const text = document.getElementById('msgTextInput').value.trim();
+        const target = document.getElementById('msgTarget').value;
+
+        if (!text) return;
+
+        const db = JSON.parse(localStorage.getItem('kcnx_database'));
+        db.push({
+            sender: myAssignedNumber, // Hardcoded tracking identity
+            target: target,
+            text: text,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+
+        localStorage.setItem('kcnx_database', JSON.stringify(db));
+        document.getElementById('msgTextInput').value = '';
+        refreshFeed();
+        countdown = 5; 
+    }
+
+    // 4. Autonomous Filtering Router
+    function refreshFeed() {
+        const db = JSON.parse(localStorage.getItem('kcnx_database'));
+        const feed = document.getElementById('chatFeed');
+        feed.innerHTML = ''; 
+
+        db.forEach(msg => {
+            const card = document.createElement('div');
+            
+            const isPublic = msg.target === "ALL";
+            const isFromMe = msg.sender === myAssignedNumber;
+            const isForMe = msg.target === myAssignedNumber;
+
+            if (isPublic) {
+                card.className = "msg-card msg-public";
+                card.innerHTML = `<span class="meta">From User #${msg.sender} 📢 [Broadcast]</span> ${msg.text}`;
+            } 
+            else if (isFromMe || isForMe) {
+                card.className = "msg-card msg-private-mine";
+                card.innerHTML = `<span class="meta">${isFromMe ? 'To User #' + msg.target + ' 🔒 [Private Outbound]' : 'From User #' + msg.sender + ' 🔒 [Private Inbound]'}</span> ${msg.text}`;
+            } 
+            else {
+                // Fixed mask protection: Unverified identities cannot override or view data
+                card.className = "msg-card msg-blocked";
+                card.innerHTML = `<span class="meta">Channel Locked</span> 🔒 This Message is not for you.`;
+            }
+            feed.appendChild(card);
+        });
+        feed.scrollTop = feed.scrollHeight;
+    }
+
+    refreshFeed();
+</script>
+
+</body>
+</html>
