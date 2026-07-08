@@ -1,8 +1,8 @@
-            <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>KCNX Cloud Router (Incognito Supported)</title>
+    <title>KCNX Cloud Router Fixed</title>
     <style>
         body { font-family: sans-serif; background: #0f172a; color: #fff; padding: 20px; display: flex; justify-content: center; }
         .app-container { width: 100%; max-width: 550px; background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
@@ -45,39 +45,42 @@
             </select>
         </div>
         <div class="controls">
-            <textarea id="msgTextInput" placeholder="Type an un-interceptable routing payload..."></textarea>
+            <textarea id="msgTextInput" placeholder="Type a message..."></textarea>
             <button onclick="sendMessage()">Send</button>
         </div>
     </div>
 </div>
 
 <script>
-    // Unique free cloud database namespace bucket for your app session
-    const BUCKET_ID = "kcnx_messenger_v2_session"; 
-    const COUNTER_URL = `https://kvdb.io/27K6WvY79bL4Y6Q8M2pZ7q/counter`;
-    const DB_URL = `https://kvdb.io/27K6WvY79bL4Y6Q8M2pZ7q/messages`;
+    // ⚠️ CHOOSE YOUR SECRET KEY NAMESPACE TO ACCESSIBLY LINK PHONES
+    // Change "kcnx_pool_z47" to any custom passphrase you want
+    const MY_PRIVATE_CHANNEL = "kcnx_pool_z47";
 
-    let myAssignedNumber = sessionStorage.getItem('kcnx_session_id');
+    const COUNTER_URL = `https://kvdb.io/Fd55uogXyxYdnXJvnyN8Xo/${MY_PRIVATE_CHANNEL}_count`;
+    const DB_URL = `https://kvdb.io/Fd55uogXyxYdnXJvnyN8Xo/${MY_PRIVATE_CHANNEL}_chat`;
+
+    let myAssignedNumber = localStorage.getItem('kcnx_hard_id');
     let countdown = 5;
 
-    // 1. Initialize & Auto-Increment Identity globally from the cloud
+    // 1. Establish Identity Assignment on Serverless cloud
     async function initializeIdentity() {
         if (!myAssignedNumber) {
             try {
-                // Instantly increments the cloud integer by 1 and returns the new value
+                // Generates an atomic increment (+1) against the key-value store database
                 const response = await fetch(COUNTER_URL, { method: 'POST', body: '1' });
                 const textNum = await response.text();
-                myAssignedNumber = textNum.trim();
-                sessionStorage.setItem('kcnx_session_id', myAssignedNumber);
+                
+                myAssignedNumber = textNum.trim() || "1";
+                localStorage.setItem('kcnx_hard_id', myAssignedNumber);
             } catch (e) {
-                myAssignedNumber = "Guest";
+                myAssignedNumber = "1"; // Fallback
             }
         }
         document.getElementById('myIdentityDisplay').innerText = `Your Device Node: User #${myAssignedNumber}`;
         refreshFeed();
     }
 
-    // 2. Continuous 5-Second Cloud Sync Engine
+    // 2. 5-Second Interval Engine
     setInterval(() => {
         countdown--;
         document.getElementById('timerDisplay').innerText = `Syncing in ${countdown}s...`;
@@ -87,20 +90,18 @@
         }
     }, 1000);
 
-    // 3. Outbound Message Push to Cloud
+    // 3. Secure Post payload
     async function sendMessage() {
         const text = document.getElementById('msgTextInput').value.trim();
         const target = document.getElementById('msgTarget').value;
         if (!text || !myAssignedNumber) return;
 
-        // Fetch current cloud chat log
         let db = [];
         try {
             const res = await fetch(DB_URL);
             if(res.status === 200) db = await res.json();
         } catch(e) {}
 
-        // Append new message metadata packet
         db.push({
             sender: myAssignedNumber,
             target: target,
@@ -108,7 +109,6 @@
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
 
-        // Write database payload back to cloud
         await fetch(DB_URL, { method: 'POST', body: JSON.stringify(db) });
 
         document.getElementById('msgTextInput').value = '';
@@ -116,15 +116,13 @@
         countdown = 5; 
     }
 
-    // 4. Inbound Filtering Router
+    // 4. Inbound Isolation Router Logic
     async function refreshFeed() {
         let db = [];
         try {
             const res = await fetch(DB_URL);
             if(res.status === 200) db = await res.json();
-        } catch(e) {
-            return; // Fail silently if cloud is updating
-        }
+        } catch(e) { return; }
 
         const feed = document.getElementById('chatFeed');
         feed.innerHTML = ''; 
@@ -145,7 +143,6 @@
                 card.innerHTML = `<span class="meta">${isFromMe ? 'To User #' + msg.target + ' 🔒 [Private Outbound]' : 'From User #' + msg.sender + ' 🔒 [Private Inbound]'}</span> ${msg.text}`;
             } 
             else {
-                // Mask Protection triggered live for unverified clients
                 card.className = "msg-card msg-blocked";
                 card.innerHTML = `<span class="meta">Channel Locked</span> 🔒 This Message is not for you.`;
             }
@@ -154,10 +151,8 @@
         feed.scrollTop = feed.scrollHeight;
     }
 
-    // Trigger on page bootup
     initializeIdentity();
 </script>
 
 </body>
-    </html>
-    
+</html>
